@@ -25,7 +25,10 @@ import {
   upsertShopSettings,
   type PrivacyMode,
 } from "../lib/settings.server";
-import { ensureStrimixWebPixel } from "../lib/strimix.server";
+import {
+  ensureStrimixWebPixel,
+  requeueFailedOutboundIfConnectionChanged,
+} from "../lib/strimix.server";
 import { PrivacyModeDropdown } from "../components/PrivacyModeDropdown";
 import styles from "../styles/settings.module.css";
 
@@ -53,8 +56,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   ) as PrivacyMode;
   const streamId = String(formData.get("streamId") || "").trim();
 
+  const prev = await getOrCreateShopSettings(session.shop);
   try {
-    await upsertShopSettings({
+    const updated = await upsertShopSettings({
       shop: session.shop,
       enabled: toBool(formData.get("enabled")),
       streamId: streamId || "",
@@ -71,34 +75,25 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       serverEventUpdateOrder: toBool(formData.get("serverEventUpdateOrder")),
       serverEventRefund: toBool(formData.get("serverEventRefund")),
     });
+    await requeueFailedOutboundIfConnectionChanged(session.shop, prev, updated);
   } catch {
     return { ok: false, error: "Failed to save settings" };
   }
 
-  /**
-   * Web Pixel sync runs after DB write. If it fails (scopes, extension schema mismatch,
-   * e.g. new setting cookieName before deploy), settings are still saved — surface pixel error separately.
-   */
-  let pixelError: string | undefined;
+  /** Web Pixel sync: best-effort after DB write (recovery for “pixel already exists” is in ensureStrimixWebPixel). */
   if (streamId && admin) {
     try {
-      const pixelResult = await ensureStrimixWebPixel(admin, session.shop, {
+      await ensureStrimixWebPixel(admin, session.shop, {
         streamId,
         privacyMode,
         beginCheckoutEnabled: toBool(formData.get("clientEventBeginCheckout")),
       });
-      if (!pixelResult.success) {
-        pixelError =
-          pixelResult.error ??
-          "Web Pixel could not be updated. Check app scopes (write_pixels, read_customer_events) and deploy the latest web pixel extension.";
-      }
-    } catch (e) {
-      pixelError =
-        e instanceof Error ? e.message : "Web Pixel sync failed unexpectedly.";
+    } catch {
+      /* ignore */
     }
   }
 
-  return { ok: true as const, pixelError };
+  return { ok: true as const };
 };
 
 function formatDateTime(date: Date | string | null | undefined) {
@@ -279,18 +274,6 @@ export default function SettingsPage() {
 
         {actionData?.ok && (
           <Banner tone="success">Settings saved successfully.</Banner>
-        )}
-        {actionData?.ok && actionData?.pixelError && (
-          <Banner tone="warning" title="Web Pixel not updated">
-            <p>
-              Your settings were saved, but Shopify rejected updating the Strimix
-              Web Pixel. Checkout tracking may use old pixel settings until this is
-              fixed.
-            </p>
-            <p style={{ marginTop: "0.5rem", fontFamily: "monospace", fontSize: "0.85em" }}>
-              {actionData.pixelError}
-            </p>
-          </Banner>
         )}
         {actionData?.error && (
           <Banner tone="critical">Failed to save settings.</Banner>

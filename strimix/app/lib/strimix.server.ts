@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import db from "../db.server";
 import { getOrCreateShopSettings, getServerApiKey } from "./settings.server";
+import { offlineSessionId } from "./shopify-session-id.server";
 
 const NON_RETRYABLE_CODES = new Set([400, 401, 403, 404, 422]);
 const RETRY_DELAYS_MS = [60_000, 120_000, 240_000];
@@ -151,7 +152,9 @@ async function sendToStrimix(shop: string, payload: unknown, streamId: string) {
   }
 }
 
-/** Send begin_checkout event from Web Pixel to Strimix. */
+/**
+ * Queue begin_checkout from Web Pixel (same durable path as webhooks: DB → retries via processDueOutboundEvents).
+ */
 export async function sendPixelBeginCheckout(
   shop: string,
   payload: {
@@ -175,7 +178,14 @@ export async function sendPixelBeginCheckout(
     products: payload.products ?? [],
   };
 
-  await sendToStrimix(shop, body, streamId);
+  await enqueueOutboundEvent({
+    shop,
+    eventName: "begin_checkout",
+    streamId,
+    payload: body,
+    source: "pixel",
+  });
+  void processDueOutboundEvents(shop);
 }
 
 export async function enqueueOutboundEvent(input: {
@@ -184,6 +194,8 @@ export async function enqueueOutboundEvent(input: {
   streamId: string;
   payload: unknown;
   webhookEventId?: string;
+  /** @default "webhook" */
+  source?: string;
 }) {
   await db.outboundEventDelivery.create({
     data: {
@@ -193,6 +205,7 @@ export async function enqueueOutboundEvent(input: {
       payloadJson: JSON.stringify(input.payload),
       webhookEventId: input.webhookEventId ?? null,
       status: "pending",
+      source: input.source ?? "webhook",
     },
   });
 }
@@ -266,6 +279,41 @@ export async function processDueOutboundEvents(shop: string, limit = 20) {
       },
     });
   }
+}
+
+/** Re-queue failed outbound deliveries (e.g. after fixing streamId / server API key). */
+export async function requeueFailedOutboundDeliveriesForShop(
+  shop: string,
+  streamId: string,
+): Promise<number> {
+  const result = await db.outboundEventDelivery.updateMany({
+    where: { shop, status: "failed" },
+    data: {
+      status: "pending",
+      attemptCount: 0,
+      nextAttemptAt: new Date(),
+      lastErrorCode: null,
+      lastErrorMessage: null,
+      sentAt: null,
+      streamId,
+    },
+  });
+  return result.count;
+}
+
+/**
+ * If streamId or server API key changed, reset failed deliveries to pending with the new streamId and kick processing.
+ */
+export async function requeueFailedOutboundIfConnectionChanged(
+  shop: string,
+  before: { streamId: string | null; serverApiKey: string | null },
+  after: { streamId: string | null; serverApiKey: string | null },
+): Promise<void> {
+  const streamChanged = (before.streamId ?? "") !== (after.streamId ?? "");
+  const apiKeyChanged = (before.serverApiKey ?? "") !== (after.serverApiKey ?? "");
+  if (!streamChanged && !apiKeyChanged) return;
+  await requeueFailedOutboundDeliveriesForShop(shop, after.streamId ?? "");
+  void processDueOutboundEvents(shop);
 }
 
 /** Returns distinct shop domains that have pending outbound events due for delivery. */
@@ -446,9 +494,8 @@ export async function setCustomerStrimixAvid(
   strimixAvid: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const session = await db.session.findFirst({
-      where: { shop, isOnline: false },
-      orderBy: { expires: "desc" },
+    const session = await db.session.findUnique({
+      where: { id: offlineSessionId(shop) },
     });
     if (!session?.accessToken) {
       return { success: false, error: "No offline session for shop" };
@@ -548,11 +595,59 @@ function firstGraphqlErrorMessage(json: unknown): string | null {
   return typeof first === "string" && first.trim() ? first.trim() : null;
 }
 
+/** Shopify returns this when a web pixel already exists but our DB lost webPixelId (e.g. new DB). */
+function isWebPixelAlreadyExistsMessage(message: string): boolean {
+  return /already been set|use the update mutation/i.test(message);
+}
+
+/** Find Strimix web pixel on the shop by matching `storeHostname` in saved settings JSON. */
+async function findWebPixelIdByStoreHostname(
+  admin: AdminGraphqlClient,
+  shop: string,
+): Promise<string | null> {
+  const response = await admin.graphql(
+    `#graphql
+    query StrimixWebPixels($first: Int!) {
+      webPixels(first: $first) {
+        nodes {
+          id
+          settings
+        }
+      }
+    }`,
+    { variables: { first: 50 } },
+  );
+  const json = (await response.json()) as {
+    data?: { webPixels?: { nodes?: Array<{ id?: string; settings?: string | null }> } };
+    errors?: Array<{ message?: string }>;
+  };
+  if (firstGraphqlErrorMessage(json)) return null;
+  for (const node of json.data?.webPixels?.nodes ?? []) {
+    if (!node?.id || node.settings == null || node.settings === "") continue;
+    try {
+      const parsed = JSON.parse(node.settings) as { storeHostname?: string };
+      if (parsed.storeHostname === shop) return node.id;
+    } catch {
+      /* ignore */
+    }
+  }
+  return null;
+}
+
 /** Create or update Web Pixel with streamId, privacyMode, storeHostname. Saves webPixelId to ShopSettings when created. */
 export async function ensureStrimixWebPixel(
   admin: AdminGraphqlClient,
   shop: string,
   options: { streamId: string; privacyMode: string; beginCheckoutEnabled?: boolean },
+): Promise<{ success: boolean; error?: string }> {
+  return ensureStrimixWebPixelInner(admin, shop, options, 0);
+}
+
+async function ensureStrimixWebPixelInner(
+  admin: AdminGraphqlClient,
+  shop: string,
+  options: { streamId: string; privacyMode: string; beginCheckoutEnabled?: boolean },
+  depth: number,
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const settingsRow = await db.shopSettings.findUnique({ where: { shop } });
@@ -637,7 +732,18 @@ export async function ensureStrimixWebPixel(
     if (gqlMsgCreate) return { success: false, error: gqlMsgCreate };
     const errors = json.data?.webPixelCreate?.userErrors ?? [];
     if (errors.length > 0) {
-      return { success: false, error: errors[0]?.message ?? "webPixelCreate failed" };
+      const msg = errors[0]?.message ?? "";
+      if (depth < 1 && isWebPixelAlreadyExistsMessage(msg)) {
+        const recoveredId = await findWebPixelIdByStoreHostname(admin, shop);
+        if (recoveredId) {
+          await db.shopSettings.update({
+            where: { shop },
+            data: { webPixelId: recoveredId },
+          });
+          return ensureStrimixWebPixelInner(admin, shop, options, depth + 1);
+        }
+      }
+      return { success: false, error: msg || "webPixelCreate failed" };
     }
     const newId = json.data?.webPixelCreate?.webPixel?.id;
     if (newId) {

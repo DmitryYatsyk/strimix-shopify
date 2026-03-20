@@ -15,25 +15,16 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// MongoDB: use session_id as _id (auto), id as unique business key so adapter's
-// upsert(update: data) is valid (Prisma allows id in update when it's not the primary key).
+// MongoDB: use session_id as _id (auto), id as unique business key.
+// Persisted fields are minimal (no OAuth state, isOnline, or merchant PII) — see MinimalPrismaSessionStorage.
 model Session {
   session_id          String    @id @default(auto()) @map("_id") @db.ObjectId
   id                  String    @unique
   shop                String
-  state               String
-  isOnline            Boolean   @default(false)
   scope               String?
   expires             DateTime?
   accessToken         String
-  userId              String?
-  firstName           String?
-  lastName            String?
-  email               String?
-  accountOwner        Boolean   @default(false)
   locale              String?
-  collaborator        Boolean?  @default(false)
-  emailVerified       Boolean?  @default(false)
   refreshToken        String?
   refreshTokenExpires DateTime?
 }

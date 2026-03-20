@@ -11,7 +11,11 @@ import {
 
 const INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
 
+let outboundTickInFlight = false;
+
 function run() {
+  if (outboundTickInFlight) return;
+  outboundTickInFlight = true;
   getShopsWithDueOutboundEvents()
     .then((shops) => {
       for (const shop of shops) {
@@ -22,6 +26,9 @@ function run() {
     })
     .catch(() => {
       /* ignore */
+    })
+    .finally(() => {
+      outboundTickInFlight = false;
     });
 }
 

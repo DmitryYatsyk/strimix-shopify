@@ -1,5 +1,4 @@
-import type { ActionFunctionArgs } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import db from "../db.server";
 import { savePixelOrderAvid, sendPixelBeginCheckout } from "../lib/strimix.server";
 

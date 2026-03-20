@@ -81,7 +81,7 @@ function getAvidFromOrder(order: StrimixOrder) {
     ...(o.custom_attributes ?? []).map((a) => ({ name: a.name, value: a.value })),
     ...(o.customAttributes ?? []).map((a) => ({ name: a.key, value: a.value })),
   ];
-  let item = attributes.find(
+  const item = attributes.find(
     (attr) => (attr?.name ?? "").toLowerCase() === STRIMIX_AVID_KEY.toLowerCase(),
   );
   let value = typeof item?.value === "string" ? item.value : undefined;
@@ -115,7 +115,8 @@ function getUserExternalIds(customer: StrimixCustomer | null | undefined, email?
 }
 
 function shouldRetry(statusCode?: number) {
-  if (!statusCode) return true;
+  // No HTTP status (config/parse/network): do not retry — avoids burning attempts on permanent misconfig.
+  if (statusCode == null || Number.isNaN(statusCode)) return false;
   if (NON_RETRYABLE_CODES.has(statusCode)) return false;
   return statusCode >= 400;
 }
@@ -277,7 +278,7 @@ export async function getShopsWithDueOutboundEvents(): Promise<string[]> {
       nextAttemptAt: { lte: now },
     },
   });
-  return rows.map((r) => r.shop);
+  return rows.map((r: { shop: string }) => r.shop);
 }
 
 export async function markWebhookReceived(input: {
@@ -364,30 +365,16 @@ export async function buildOrderEventPayload(
   order: { id: string; status: string; value: number; paid_value: number; currency: string };
   products: ReturnType<typeof mapProducts>;
 }> {
-  let avidSource: "cookie" | "inline_item" | "attribute" | "metafield" | "pixel_order" | "none" = "none";
   let strimixAvid: string | null = null;
 
   if (options?.pixelStrimixAvid) {
     strimixAvid = options.pixelStrimixAvid;
-    if (options.pixelAvidSource === "cookie") avidSource = "cookie";
-    else if (options.pixelAvidSource === "inline_item") avidSource = "inline_item";
-    else avidSource = "pixel_order";
+    // pixelAvidSource (cookie | checkout_attribute | none from web pixel) is persisted on PixelOrderAvid, not duplicated here.
   } else {
     const orderAvid = getAvidFromOrder(order);
     if (orderAvid) {
-      const firstLine = order.line_items?.[0] ?? null;
-      const lineAttrs = (firstLine?.customAttributes ?? []) as Array<{ key?: string | null; value?: string | null }>;
-      const hasInlineAvid =
-        lineAttrs.some(
-          (a) =>
-            (a?.key ?? "").toLowerCase() === STRIMIX_AVID_LINE_ITEM_KEY.toLowerCase() &&
-            typeof a?.value === "string" &&
-            a.value.trim().length > 0,
-        );
-      avidSource = hasInlineAvid ? "inline_item" : "attribute";
       strimixAvid = orderAvid;
     } else if (order.customerStrimixAvid) {
-      avidSource = "metafield";
       strimixAvid = order.customerStrimixAvid;
     }
   }

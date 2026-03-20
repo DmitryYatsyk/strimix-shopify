@@ -8,7 +8,7 @@ import en from "@shopify/polaris/locales/en.json";
 import { authenticate } from "../shopify.server";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  await authenticate.admin(request);
   return {
     apiKey: process.env.SHOPIFY_API_KEY || "",
   };

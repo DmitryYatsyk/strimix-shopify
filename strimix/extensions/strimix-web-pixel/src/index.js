@@ -81,8 +81,8 @@ function getProductsFromCheckout(checkout) {
 }
 
 /**
- * Public handler is GET/POST /pixel-events on the app host (token auth).
- * Never use .../apps/strimix/pixel-events from the browser — that hits App Proxy routes.
+ * Public handler is POST /pixel-events on the app host (shop + pixel_token in JSON).
+ * There is no App Proxy duplicate route in this app — always use the app origin + /pixel-events.
  */
 function pixelEventsEndpoint(appBaseUrlRaw) {
   const trimmed = String(appBaseUrlRaw ?? "").trim().replace(/\/+$/, "");

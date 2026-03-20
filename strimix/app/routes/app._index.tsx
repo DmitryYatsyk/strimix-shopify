@@ -489,12 +489,12 @@ export default function SettingsPage() {
                                 onClick={(e) => {
                                   const target = e.target as HTMLElement;
                                   if (target.closest?.("input[type='checkbox']") || target.closest?.("label")) return;
-                                  set((v) => !v);
+                                  set((v: boolean) => !v);
                                 }}
                                 onKeyDown={(e) => {
                                   if (e.key === "Enter" || e.key === " ") {
                                     e.preventDefault();
-                                    set((v) => !v);
+                                    set((v: boolean) => !v);
                                   }
                                 }}
                               >
@@ -524,12 +524,12 @@ export default function SettingsPage() {
                                 onClick={(e) => {
                                   const target = e.target as HTMLElement;
                                   if (target.closest?.("input[type='checkbox']") || target.closest?.("label")) return;
-                                  set((v) => !v);
+                                  set((v: boolean) => !v);
                                 }}
                                 onKeyDown={(e) => {
                                   if (e.key === "Enter" || e.key === " ") {
                                     e.preventDefault();
-                                    set((v) => !v);
+                                    set((v: boolean) => !v);
                                   }
                                 }}
                               >

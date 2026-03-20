@@ -23,11 +23,9 @@ function parseAvidFromCookie(cookieHeader: string | null): string | null {
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   try {
-    let shop: string | null = null;
     if (request.url.includes("signed") || request.headers.get("x-shopify-app-proxy")) {
       try {
-        const { session } = await authenticate.public.appProxy(request);
-        shop = session?.shop ?? null;
+        await authenticate.public.appProxy(request);
       } catch {
         return new Response(
           JSON.stringify({ strimix_avid: null, error: "invalid_proxy" }),

@@ -1,0 +1,228 @@
+/* Strimix settings – accordion cards with thin accent border */
+.sectionCard {
+  border-top: 3px solid #00bcd4;
+  border-radius: 14px;
+}
+
+/* Accordion section header: clickable, title left, chevron right */
+.accordionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 0;
+  margin: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  border-radius: 8px;
+  transition: background-color 0.15s ease;
+}
+
+.accordionHeader:hover {
+  background: rgba(0, 188, 212, 0.06);
+}
+
+.accordionHeader:focus-visible {
+  outline: 2px solid #00bcd4;
+  outline-offset: 2px;
+}
+
+/* Left part: title + help icon – takes remaining space so chevron stays right */
+.accordionHeaderTitle {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Chevron at the end, same width so all arrows align vertically */
+.accordionChevron {
+  flex-shrink: 0;
+  width: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-left: 8px;
+}
+
+.accordionChevron svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* Help icon (?) next to section title – default */
+.helpIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: help;
+}
+
+.helpIconInner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--p-color-text-subdued, #6d7175);
+  border-radius: 50%;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.helpIcon:hover .helpIconInner {
+  color: #00bcd4;
+  background: rgba(0, 188, 212, 0.1);
+}
+
+/* Red help icon for Connection section */
+.helpIconRed .helpIconInner {
+  color: #d63638;
+}
+
+.helpIconRed:hover .helpIconInner {
+  color: #b32d2e;
+  background: rgba(214, 54, 56, 0.08);
+}
+
+/* Enable tracking checkbox row – pointer cursor */
+.enableTrackingRow {
+  cursor: pointer;
+}
+
+.enableTrackingRow * {
+  cursor: pointer;
+}
+
+/* Connection: row1 col2 — button above Server API Key column */
+.connectionTopGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.connectionTopCol2 {
+  justify-self: start;
+  min-width: 0;
+}
+
+.themeEditorButtonWrap {
+  width: 280px;
+  max-width: 100%;
+}
+
+.connectionFieldsRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 600px) {
+  .connectionTopGrid,
+  .connectionFieldsRow {
+    grid-template-columns: 1fr;
+  }
+
+  .connectionTopCol2 {
+    justify-self: stretch;
+  }
+
+  .themeEditorButtonWrap {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+/* Events section: Theme events and Server events in a row */
+.eventsGroup {
+  min-width: 180px;
+  flex: 1;
+}
+
+/* Events checkboxes: whole row clickable, pointer cursor */
+.interactiveRow {
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin: -6px -10px;
+}
+
+.interactiveRow:hover {
+  background: rgba(0, 188, 212, 0.08);
+}
+
+.interactiveRow,
+.interactiveRow *,
+.interactiveRow label,
+.interactiveRow input {
+  cursor: pointer !important;
+}
+
+/* Connection section: Stream ID and Server API Key in a row */
+.connectionField {
+  min-width: 200px;
+  flex: 1;
+}
+
+/* Stream ID and Server API Key – fixed width, password-style for API Key */
+.inputFieldWrap {
+  width: 300px;
+  max-width: 100%;
+}
+
+.inputFieldWrap input {
+  width: 100% !important;
+  min-width: 0;
+  padding: 8px 12px !important;
+  outline: none !important;
+  border: 1px solid var(--p-color-border, #8c9196) !important;
+  border-radius: 8px !important;
+  background: var(--p-color-bg-surface, #fff) !important;
+  font-size: 14px !important;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.inputFieldWrap input:hover {
+  border-color: var(--p-color-border-hover, #6d7175) !important;
+}
+
+.inputFieldWrap input:focus {
+  outline: none !important;
+  border-color: #00bcd4 !important;
+  box-shadow: 0 0 0 1px #00bcd4 !important;
+}
+
+/* Privacy mode dropdown – improved hover and pointer */
+.privacyDropdownWrap {
+  cursor: pointer;
+}
+
+.privacyTrigger {
+  cursor: pointer;
+  width: 300px;
+  max-width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  border: 1px solid var(--p-color-border, #8c9196);
+  border-radius: 8px;
+  background: var(--p-color-bg-surface, #fff);
+  font-size: 14px;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.privacyTrigger:hover {
+  background: rgba(0, 188, 212, 0.06);
+  border-color: var(--p-color-border-hover, #6d7175);
+}
+
+.privacyTrigger:focus-visible {
+  outline: none;
+  border-color: #00bcd4;
+  box-shadow: 0 0 0 1px #00bcd4;
+}

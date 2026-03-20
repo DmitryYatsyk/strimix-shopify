@@ -1,0 +1,114 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+//
+// MongoDB: do NOT use "prisma migrate deploy". Use "prisma db push" (or npm run db:deploy) to sync schema.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
+// enough when changing adapters.
+// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// MongoDB: use session_id as _id (auto), id as unique business key so adapter's
+// upsert(update: data) is valid (Prisma allows id in update when it's not the primary key).
+model Session {
+  session_id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  id                  String    @unique
+  shop                String
+  state               String
+  isOnline            Boolean   @default(false)
+  scope               String?
+  expires             DateTime?
+  accessToken         String
+  userId              String?
+  firstName           String?
+  lastName            String?
+  email               String?
+  accountOwner        Boolean   @default(false)
+  locale              String?
+  collaborator        Boolean?  @default(false)
+  emailVerified       Boolean?  @default(false)
+  refreshToken        String?
+  refreshTokenExpires DateTime?
+}
+
+model ShopSettings {
+  id                        String    @id @default(auto()) @map("_id") @db.ObjectId
+  shop                      String    @unique
+  enabled                   Boolean   @default(true)
+  streamId                  String?
+  serverApiKey               String?
+  cookieName                String    @default("sx_uid")
+  privacyMode               String    @default("strict")
+  pixelToken                String?
+  clientEventViewProduct    Boolean   @default(true)
+  clientEventAddToCart      Boolean   @default(true)
+  clientEventRemoveFromCart Boolean   @default(true)
+  clientEventBeginCheckout  Boolean   @default(true)
+  serverEventNewOrder       Boolean   @default(true)
+  serverEventUpdateOrder    Boolean   @default(true)
+  serverEventRefund         Boolean   @default(true)
+  lastWebhookReceivedAt     DateTime?
+  lastWebhookTopic          String?
+  lastWebhookEventId        String?
+  lastServerSendStatus      String?
+  lastServerSendAt          DateTime?
+  lastErrorMessage          String?
+  webPixelId                String?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+}
+
+model WebhookDelivery {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  shop        String
+  topic       String
+  eventId     String
+  resourceId  String?
+  status      String   @default("processed")
+  processedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@unique([shop, eventId])
+  @@index([shop, topic])
+}
+
+model OutboundEventDelivery {
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  shop             String
+  eventName        String
+  payloadJson      String
+  streamId         String
+  status           String    @default("pending")
+  attemptCount     Int       @default(0)
+  nextAttemptAt    DateTime  @default(now())
+  lastErrorCode    Int?
+  lastErrorMessage String?
+  webhookEventId   String?
+  source           String    @default("webhook")
+  sentAt           DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([status, nextAttemptAt])
+  @@index([shop, eventName])
+}
+
+/// order_id + strimix_avid from Web Pixel (checkout_completed) for linking with webhook orders/paid
+model PixelOrderAvid {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  shop         String
+  orderId      String
+  strimixAvid  String
+  avidSource   String?
+  createdAt    DateTime @default(now())
+
+  @@unique([shop, orderId])
+  @@index([shop])
+}

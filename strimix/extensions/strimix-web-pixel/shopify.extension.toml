@@ -1,0 +1,51 @@
+# Strimix Web Pixel: begin_checkout + checkout_completed (purchase), strimix_avid linking
+
+uid = "e8c7e7d4-ca30-f7a6-21b7-58179a0d62f608390001"
+
+type = "web_pixel_extension"
+name = "Strimix Web Pixel"
+runtime_context = "strict"
+
+[customer_privacy]
+analytics = false
+marketing = false
+preferences = false
+sale_of_data = "disabled"
+
+[settings]
+type = "object"
+
+[settings.fields.streamId]
+name = "Stream ID"
+description = "Strimix stream ID"
+type = "single_line_text_field"
+
+[settings.fields.privacyMode]
+name = "Privacy mode"
+description = "strict | balanced | disabled"
+type = "single_line_text_field"
+
+[settings.fields.beginCheckoutEnabled]
+name = "Begin checkout enabled"
+description = "true | false"
+type = "single_line_text_field"
+
+[settings.fields.storeHostname]
+name = "Store hostname"
+description = "Shop hostname for pixel endpoint (e.g. store.myshopify.com)"
+type = "single_line_text_field"
+
+[settings.fields.appBaseUrl]
+name = "App base URL"
+description = "Public app base URL (e.g. https://your-app.trycloudflare.com)"
+type = "single_line_text_field"
+
+[settings.fields.pixelToken]
+name = "Pixel token"
+description = "Auth token for pixel->app requests"
+type = "single_line_text_field"
+
+[settings.fields.cookieName]
+name = "Strimix cookie name"
+description = "Same as storefront embed cookie (default sx_uid). Checkout often cannot read this cookie; cart attribute strimix_avid is used then."
+type = "single_line_text_field"

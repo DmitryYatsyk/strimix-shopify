@@ -1,0 +1,8 @@
+name = "React Router"
+roles = ["frontend", "backend"]
+webhooks_path = "/webhooks/app/uninstalled"
+
+[commands]
+predev = "npx prisma generate"
+# MongoDB: use db push (migrate deploy not supported). Run db:deploy when schema changes.
+dev = "npx prisma db push && npm exec react-router dev"

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
-import { useActionData, useLoaderData, Form } from "react-router";
+import { useActionData, useLoaderData, Form, useLocation } from "react-router";
 import {
   Page,
   Card,
@@ -21,6 +21,11 @@ import { ChevronDownIcon, ChevronUpIcon } from "@shopify/polaris-icons";
 import { TitleBar } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import {
+  clearCustomerDataRequestsForShop,
+  listCustomerDataRequestsForShop,
+  type CustomerDataRequestListItem,
+} from "../lib/compliance.server";
+import {
   getOrCreateShopSettings,
   upsertShopSettings,
   type PrivacyMode,
@@ -40,16 +45,24 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const settings = await getOrCreateShopSettings(session.shop);
   const themeEditorAppEmbedsUrl = `https://${session.shop}/admin/themes/current/editor?context=apps`;
+  const customerDataRequests = await listCustomerDataRequestsForShop(session.shop);
   return {
     shop: session.shop,
     settings,
     themeEditorAppEmbedsUrl,
+    customerDataRequests,
   };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { session, admin } = await authenticate.admin(request);
   const formData = await request.formData();
+  const intent = String(formData.get("intent") ?? "");
+
+  if (intent === "clearCustomerDataRequests") {
+    await clearCustomerDataRequestsForShop(session.shop);
+    return { ok: true as const, action: "customer_data_requests_cleared" as const };
+  }
 
   const privacyMode = String(
     formData.get("privacyMode") || "strict",
@@ -93,7 +106,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     }
   }
 
-  return { ok: true as const };
+  return { ok: true as const, action: "settings_saved" as const };
 };
 
 function formatDateTime(date: Date | string | null | undefined) {
@@ -154,14 +167,17 @@ function AccordionHeader({
 }
 
 export default function SettingsPage() {
-  const { settings, themeEditorAppEmbedsUrl } = useLoaderData<typeof loader>();
+  const { settings, themeEditorAppEmbedsUrl, customerDataRequests } =
+    useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
+  const location = useLocation();
   const pageTopRef = useRef<HTMLDivElement>(null);
 
   const [openStatus, setOpenStatus] = useState(false);
   const [openConnection, setOpenConnection] = useState(false);
   const [openPrivacy, setOpenPrivacy] = useState(false);
   const [openEvents, setOpenEvents] = useState(false);
+  const [openCustomerDataRequests, setOpenCustomerDataRequests] = useState(false);
 
   const [privacyMode, setPrivacyMode] = useState(settings.privacyMode);
   const [serverApiKey, setServerApiKey] = useState("");
@@ -272,8 +288,11 @@ export default function SettingsPage() {
           events below.
         </Text>
 
-        {actionData?.ok && (
+        {actionData?.ok && actionData?.action === "settings_saved" && (
           <Banner tone="success">Settings saved successfully.</Banner>
+        )}
+        {actionData?.ok && actionData?.action === "customer_data_requests_cleared" && (
+          <Banner tone="success">Customer data requests list cleared.</Banner>
         )}
         {actionData?.error && (
           <Banner tone="critical">Failed to save settings.</Banner>
@@ -319,6 +338,88 @@ export default function SettingsPage() {
                         </Text>
                       )}
                     </Banner>
+                  )}
+
+                  {customerDataRequests.length > 0 && (
+                    <Box paddingBlockStart="200">
+                      <BlockStack gap="300">
+                        <InlineStack align="space-between" blockAlign="center">
+                          <button
+                            type="button"
+                            className={styles.accordionHeader}
+                            onClick={() => setOpenCustomerDataRequests((v) => !v)}
+                            aria-expanded={openCustomerDataRequests}
+                            aria-controls="customer-data-requests-list"
+                          >
+                            <span className={styles.accordionHeaderTitle}>
+                              <Text as="span" variant="bodyMd" fontWeight="semibold">
+                                Customer data requests
+                              </Text>
+                              {!openCustomerDataRequests && (
+                                <span
+                                  style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: "6px",
+                                    marginLeft: "6px",
+                                  }}
+                                >
+                                  <Text as="span" variant="bodyMd" fontWeight="semibold">
+                                    ({customerDataRequests.length})
+                                  </Text>
+                                  <span
+                                    className={styles.helpIconRed}
+                                    onClick={(e) => e.stopPropagation()}
+                                    role="presentation"
+                                  >
+                                    <Tooltip content="Shopify may request customer data stored by this app (for example, for privacy or legal reasons). When such a request is received, it appears here and can be downloaded as JSON." preferredPosition="above">
+                                      <span className={styles.helpIconInner} aria-hidden>?</span>
+                                    </Tooltip>
+                                  </span>
+                                </span>
+                              )}
+                            </span>
+                            <span className={styles.accordionChevron}>
+                              <Icon source={openCustomerDataRequests ? ChevronUpIcon : ChevronDownIcon} tone="subdued" />
+                            </span>
+                          </button>
+                          <Form method="post" style={{ marginTop: "5px" }}>
+                            <input type="hidden" name="intent" value="clearCustomerDataRequests" />
+                            <Button submit size="slim" tone="critical">
+                              Clear list
+                            </Button>
+                          </Form>
+                        </InlineStack>
+                        <Collapsible id="customer-data-requests-list" open={openCustomerDataRequests}>
+                          <Box paddingBlockStart="200">
+                            <BlockStack gap="200">
+                              {customerDataRequests.map((row: CustomerDataRequestListItem) => (
+                                <InlineStack
+                                  key={row.id}
+                                  gap="300"
+                                  blockAlign="center"
+                                  wrap
+                                >
+                                  <Text as="span" variant="bodyMd">
+                                    {formatDateTime(row.createdAt)} — customer{" "}
+                                    {row.shopifyCustomerId}
+                                    {row.shopifyDataRequestId
+                                      ? ` (request ${row.shopifyDataRequestId})`
+                                      : ""}
+                                  </Text>
+                                  <Button
+                                    size="slim"
+                                    url={`/app/customer-data/${row.id}${location.search}`}
+                                  >
+                                    Download JSON
+                                  </Button>
+                                </InlineStack>
+                              ))}
+                            </BlockStack>
+                          </Box>
+                        </Collapsible>
+                      </BlockStack>
+                    </Box>
                   )}
                 </BlockStack>
               </Box>

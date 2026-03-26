@@ -31,6 +31,19 @@ api_version = "2026-04"
   topics = [ "refunds/create" ]
   uri = "/webhooks/refunds/create"
 
+  # Mandatory GDPR webhooks — use compliance_topics, not topics (see Shopify docs).
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers-data-request"
+  compliance_topics = [ "customers/data_request" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers-redact"
+  compliance_topics = [ "customers/redact" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/shop-redact"
+  compliance_topics = [ "shop/redact" ]
+
 [access_scopes]
 # read_orders: webhooks; read_products: Admin GraphQL order lines
 # write_pixels + read_customer_events: required for app Web Pixel (Customer events)

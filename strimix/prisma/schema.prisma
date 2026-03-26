@@ -91,6 +91,20 @@ model OutboundEventDelivery {
   @@index([shop, eventName])
 }
 
+/// GDPR: snapshot from customers/data_request for merchant download in admin
+model CustomerDataRequest {
+  id                    String   @id @default(auto()) @map("_id") @db.ObjectId
+  shop                  String
+  shopifyCustomerId     String
+  shopifyDataRequestId  String?
+  ordersRequestedJson   String
+  exportJson            String
+  webhookEventId        String   @unique
+  createdAt             DateTime @default(now())
+
+  @@index([shop, createdAt])
+}
+
 /// order_id + strimix_avid from Web Pixel (checkout_completed) for linking with webhook orders/paid
 model PixelOrderAvid {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId

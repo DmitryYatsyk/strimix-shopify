@@ -11,6 +11,7 @@ import {
   processDueOutboundEvents,
 } from "../lib/strimix.server";
 
+/** Shopify topic: orders/create — enqueue new_order when the order is created (not only when paid). */
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { topic, shop, payload, admin } = await authenticate.webhook(request);
   const eventId = request.headers.get("x-shopify-event-id") ?? `${shop}:${topic}:${payload?.id}`;

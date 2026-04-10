@@ -28,7 +28,7 @@ export function getInlineTrackerScript(
 
 /**
  * Returns the tracking logic: page_view, view_product, add_to_cart, remove_from_cart.
- * Order completion is server-side (new_order). Buy now: inject line item property _strimix_avid.
+ * Order creation is server-side (new_order via orders/create webhook). Buy now: inject line item property _strimix_avid.
  */
 export function getTrackingLogicScript(): string {
   return `
